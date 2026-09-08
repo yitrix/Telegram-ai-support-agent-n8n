@@ -1,0 +1,970 @@
+{
+  "name": "invoice loader",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        -48
+      ],
+      "id": "689eb979-ed30-45b7-812b-0536c4ba8081",
+      "name": "Telegram Trigger",
+      "webhookId": "55719f6c-7bf4-406f-a0f8-58b6745577db",
+      "credentials": {
+        "telegramApi": {
+          "id": "8LWIdXgbx6KBW3k8",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.document.file_id }}",
+        "additionalFields": {
+          "mimeType": ""
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        80
+      ],
+      "id": "3638c185-478a-49ce-877b-513452829c42",
+      "name": "Get a file1",
+      "webhookId": "17b93080-32f4-4579-a91f-b9a4d1065a4d",
+      "credentials": {
+        "telegramApi": {
+          "id": "8LWIdXgbx6KBW3k8",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b5084f21-ed68-422b-b165-5e5d7bbef6c5",
+              "leftValue": "={{ $json.message.photo[0].file_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        -48
+      ],
+      "id": "6b117362-4440-4730-8bc7-37a58d0c4e70",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "63cd2321-796d-4994-a274-766122f70860",
+              "name": "invoice",
+              "value": "={{ $json.ParsedResults[0].ParsedText }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        -144
+      ],
+      "id": "cab4abc8-cb92-4cf3-b26f-7939dd03783c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "outputFieldName": "invoice"
+      },
+      "type": "n8n-nodes-word-extractor.TextExtractor",
+      "typeVersion": 1,
+      "position": [
+        672,
+        80
+      ],
+      "id": "36410672-604c-462f-bf22-3821796062d2",
+      "name": "Universal File Extractor"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Invoice:{{ $json.invoice }}\nExtract the following fields from this invoice/receipt as JSON only:\n- vendor_name\n- invoice_date\n- total_amount\n- currency\n- category (guess from vendor: office supplies/utilities/travel/food/software/other)\n- line_items (array of {description, amount})",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        880,
+        -64
+      ],
+      "id": "54b24dfe-3cf1-4e04-927a-b8ea347f9495",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "ministral-14b-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        912,
+        192
+      ],
+      "id": "a4808d08-657d-43a8-94a9-6cd21f6d6c5c",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "iExkqlP8urMapI6v",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"vendor_name\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Name of the vendor or business on the invoice/receipt\"\n    },\n    \"invoice_date\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Date of the invoice in YYYY-MM-DD format\"\n    },\n    \"total_amount\": {\n      \"type\": [\"number\", \"null\"],\n      \"description\": \"Total amount charged on the invoice\"\n    },\n    \"currency\": {\n      \"type\": [\"string\", \"null\"],\n      \"description\": \"Currency code, e.g. INR, USD\"\n    },\n    \"category\": {\n      \"type\": \"string\",\n      \"enum\": [\"office supplies\", \"utilities\", \"travel\", \"food\", \"software\", \"other\"],\n      \"description\": \"Best-guess category based on vendor and items\"\n    },\n    \"line_items\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"description\": {\n            \"type\": [\"string\", \"null\"]\n          },\n          \"amount\": {\n            \"type\": [\"number\", \"null\"]\n          }\n        },\n        \"required\": [\"description\", \"amount\"]\n      }\n    }\n  },\n  \"required\": [\"vendor_name\", \"invoice_date\", \"total_amount\", \"currency\", \"category\", \"line_items\"]\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        160
+      ],
+      "id": "248a6397-98a7-48a0-a7c2-631a2cda5fde",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": "ministral-14b-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        304
+      ],
+      "id": "0013c51b-7888-42ac-8fe9-57eadb70a031",
+      "name": "Mistral Cloud Chat Model1",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "iExkqlP8urMapI6v",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e5a76cae-5821-410d-ac44-df51c4b3e10f",
+              "leftValue": "={{ $('AI Agent').item.json.output.total_amount }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "fa2dcfd1-6bfb-4c4c-bbd7-02e57d1502e2",
+              "leftValue": "={{ $('AI Agent').item.json.output.total_amount }}",
+              "rightValue": 250,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        -80
+      ],
+      "id": "d7365d4f-1752-4388-9b05-f34d6112d577",
+      "name": "If1",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8db8ae6b-3f92-4253-b5d4-9288e01a3fa5",
+              "leftValue": "={{ $('AI Agent').item.json.output.vendor_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1792,
+        -64
+      ],
+      "id": "ed7c4042-e02c-4d78-bd14-dc61c3f3da92",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg",
+          "mode": "list",
+          "cachedResultName": "expenses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 800560452,
+          "mode": "list",
+          "cachedResultName": "expenses_sample_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit#gid=800560452"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "vendor_name",
+              "lookupValue": "={{ $json.output.vendor_name }}"
+            },
+            {
+              "lookupColumn": "invoice_date",
+              "lookupValue": "={{ $json.output.invoice_date }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1200,
+        -64
+      ],
+      "id": "ea9bd5ff-ea7c-43b3-baef-c134237b5472",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZcvQkgTKuuIHb77z",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg",
+          "mode": "list",
+          "cachedResultName": "expenses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 800560452,
+          "mode": "list",
+          "cachedResultName": "expenses_sample_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit#gid=800560452"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "vendor_name": "={{ $('AI Agent').item.json.output.vendor_name }}",
+            "invoice_date": "={{ $('AI Agent').item.json.output.invoice_date }}",
+            "total_amount": "={{ $('AI Agent').item.json.output.total_amount }}",
+            "currency": "={{ $('AI Agent').item.json.output.currency }}",
+            "category": "={{ $('AI Agent').item.json.output.category }}",
+            "line_items": "={{ $('AI Agent').item.json.output.line_items }}",
+            "submitted_by": "={{ $('Telegram Trigger').item.json.message.chat.first_name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "total_amount",
+              "displayName": "total_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "line_items",
+              "displayName": "line_items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "submitted_by",
+              "displayName": "submitted_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "flag_reason",
+              "displayName": "flag_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1968,
+        -80
+      ],
+      "id": "eaf20257-91cc-48ba-b162-ce2372a73363",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZcvQkgTKuuIHb77z",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1284c6fb-5a63-4f58-976f-2348bc441587",
+              "leftValue": "={{ $json.vendor_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        -64
+      ],
+      "id": "38edd4ac-2af7-4c6b-b19a-bce863f1cede",
+      "name": "If3",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f3ba094-e18b-44c0-b56a-1732d1597f7f",
+              "name": "vendor_name",
+              "value": "={{ $('AI Agent').item.json.output.vendor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "e3be8078-d2f4-43d4-a126-80d0f0dcf954",
+              "name": "total_amount",
+              "value": "={{ $('AI Agent').item.json.output.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "bb8b034c-255b-44a4-ac5c-1f2f33e2dccf",
+              "name": "existed_vendor",
+              "value": "={{ $json.vendor_name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1664,
+        304
+      ],
+      "id": "563f9847-4f92-43f9-a53f-194eae81196e",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "8996395935",
+        "message": "=ammount-{{ $('AI Agent').item.json.output.total_amount }}\nVendor - {{ $('AI Agent').item.json.output.vendor_name }}\nalready exists(empty if not) - {{ $('Get row(s) in sheet').item.json.vendor_name }}\n",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Approval status",
+              "fieldType": "radio",
+              "defaultValue": "Approve",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Approve"
+                  },
+                  {
+                    "option": "Rejecet"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reject Reason (optional)",
+              "fieldType": "textarea",
+              "placeholder": "Reason for Rejection"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1840,
+        304
+      ],
+      "id": "dfd95535-47e8-44b7-9edb-85025ec57c4a",
+      "name": "Send message and wait for response",
+      "webhookId": "0fed98bf-2fd9-4260-8217-27a85dc0f322",
+      "credentials": {
+        "telegramApi": {
+          "id": "8LWIdXgbx6KBW3k8",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg",
+          "mode": "list",
+          "cachedResultName": "expenses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 800560452,
+          "mode": "list",
+          "cachedResultName": "expenses_sample_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TiCJ5vY_YMEipAA8hZ7P38IEDzuZZ36ojfBu_SE0Rrg/edit#gid=800560452"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "flag_reason": "={{ $json.data['Reject Reason (optional)'] }}",
+            "status": "={{ $json.data['Approval status'] }}",
+            "vendor_name": "={{ $('AI Agent').item.json.output.vendor_name }}",
+            "invoice_date": "={{ $('AI Agent').item.json.output.invoice_date }}",
+            "total_amount": "={{ $('AI Agent').item.json.output.total_amount }}",
+            "currency": "={{ $('AI Agent').item.json.output.currency }}",
+            "category": "={{ $('AI Agent').item.json.output.category }}",
+            "line_items": "={{ $('AI Agent').item.json.output.line_items }}",
+            "submitted_by": "={{ $('Telegram Trigger').item.json.message.from.first_name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_date",
+              "displayName": "invoice_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_amount",
+              "displayName": "total_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "line_items",
+              "displayName": "line_items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_by",
+              "displayName": "submitted_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "flag_reason",
+              "displayName": "flag_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1984,
+        304
+      ],
+      "id": "e5e2c869-2660-444b-bb98-e606eb270fe1",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZcvQkgTKuuIHb77z",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "K85836856188957"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        -144
+      ],
+      "id": "2e02371c-932f-49cd-9867-3133aa0cc22c",
+      "name": "recived file"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file1": {
+      "main": [
+        [
+          {
+            "node": "Universal File Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "recived file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get a file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Universal File Extractor": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "recived file": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "67c4391f-07fc-4391-b322-be5c61fc65f4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2c4b55a58fb86d732418e398a86027c2a53686948f056cfa127529cd77c352a9"
+  },
+  "nodeGroups": [],
+  "id": "VCZV3dBgOsJHc72d",
+  "tags": []
+}
